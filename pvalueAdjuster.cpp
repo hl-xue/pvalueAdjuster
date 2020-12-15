@@ -2,6 +2,7 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <cmath>
 
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/copy.hpp>
@@ -65,14 +66,20 @@ const void ScanPValue(std::vector<std::pair<std::string, double>> &feature_pvalu
     inbuf.push(pvalue_file);
     std::istream feature_count_instream(&inbuf);
 
-    std::string line, str_x;
+    std::string line, feature_str, val_str;
     std::istringstream conv;
-    double pvalue;
     while (std::getline(feature_count_instream, line))
     {
         conv.str(line);
-        conv >> str_x >> pvalue;
-        feature_pvalue.emplace_back(std::make_pair(str_x, pvalue));
+        conv >> feature_str >> val_str;
+        if (val_str == "NA" || val_str == "NAN" || val_str == "na" || val_str == "NaN" || val_str == "nan")
+        {
+            feature_pvalue.emplace_back(std::make_pair(feature_str, std::nanf("")));
+        }
+        else
+        {
+            feature_pvalue.emplace_back(std::make_pair(feature_str, std::stod(val_str)));
+        }
         conv.clear();
     }
     pvalue_file.close();
@@ -80,33 +87,28 @@ const void ScanPValue(std::vector<std::pair<std::string, double>> &feature_pvalu
 
 void SortPvalue(std::vector<std::pair<std::string, double>> &feature_pvalue)
 {
-    auto comp = [](std::pair<std::string, double> p1, std::pair<std::string, double> p2) -> bool { return p1.second < p2.second; };
+    auto comp = [](std::pair<std::string, double> p1, std::pair<std::string, double> p2) -> bool { return p1.second < p2.second || std::isnan(p2.second); };
     std::sort(feature_pvalue.begin(), feature_pvalue.end(), comp);
 }
 
 void PValueAdjustmentBH(std::vector<std::pair<std::string, double>> &feature_pvalue)
 {
-    double tot_num = feature_pvalue.size();
-    for (size_t i(0); i < tot_num; ++i)
+    long i_feature = feature_pvalue.size() - 1;
+    while (std::isnan(feature_pvalue[i_feature].second))
     {
-        const double adjust_factor = tot_num / (i + 1);
-        feature_pvalue[i].second *= adjust_factor;
-        if (feature_pvalue[i].second > 1)
-        {
-            feature_pvalue[i].second = 1;
-        }
-        else if (feature_pvalue[i].second < 0)
-        {
-            feature_pvalue[i].second = 0;
-        }
+        --i_feature;
     }
-    for (auto iter = feature_pvalue.rbegin() + 1; iter < feature_pvalue.rend(); ++iter)
+    double tot_num = i_feature + 1, adjust_factor;
+    --i_feature; // the last pvalue need not to be adjusted (adjust_factor == 1)
+    while (i_feature >= 0)
     {
-        double last_score = (iter - 1)->second;
-        if (iter->second > last_score)
+        adjust_factor = tot_num / (i_feature + 1);
+        feature_pvalue[i_feature].second *= adjust_factor;
+        if (feature_pvalue[i_feature].second > feature_pvalue[i_feature + 1].second)
         {
-            iter->second = last_score;
+            feature_pvalue[i_feature].second = feature_pvalue[i_feature + 1].second;
         }
+        --i_feature;
     }
 }
 
@@ -120,7 +122,14 @@ void PvaluePrint(const std::vector<std::pair<std::string, double>> &feature_pval
     }
     for (const auto &kp : feature_pvalue)
     {
-        out_file << kp.first << "\t" << kp.second << std::endl;
+        if (std::isnan(kp.second))
+        {
+            out_file << kp.first << "\tNA" << std::endl;
+        }
+        else
+        {
+            out_file << kp.first << "\t" << kp.second << std::endl;
+        }
     }
     out_file.close();
 }
@@ -133,7 +142,7 @@ int main(int argc, char *argv[])
 
     std::clock_t begin_time = clock(), inter_time;
     std::vector<std::pair<std::string, double>> feature_pvalue;
-    
+
     ScanPValue(feature_pvalue, raw_pvalue_path);
     std::cerr << "Raw p-value scanning finished, execution time: " << (float)(clock() - begin_time) / CLOCKS_PER_SEC << "s." << std::endl;
     inter_time = clock();
