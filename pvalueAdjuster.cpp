@@ -87,7 +87,9 @@ const void ScanPValue(std::vector<std::pair<std::string, double>> &feature_pvalu
 
 void SortPvalue(std::vector<std::pair<std::string, double>> &feature_pvalue)
 {
-    auto comp = [](std::pair<std::string, double> p1, std::pair<std::string, double> p2) -> bool { return p1.second < p2.second || std::isnan(p2.second); };
+    auto comp = [](std::pair<std::string, double> p1, std::pair<std::string, double> p2) -> bool {
+        return ((p1.second < p2.second) || (!std::isnan(p1.second) && std::isnan(p2.second)));
+    };
     std::sort(feature_pvalue.begin(), feature_pvalue.end(), comp);
 }
 
@@ -144,6 +146,7 @@ int main(int argc, char *argv[])
     std::vector<std::pair<std::string, double>> feature_pvalue;
 
     ScanPValue(feature_pvalue, raw_pvalue_path);
+    std::cerr << "Loaded p-value number: " << feature_pvalue.size() << std::endl;
     std::cerr << "Raw p-value scanning finished, execution time: " << (float)(clock() - begin_time) / CLOCKS_PER_SEC << "s." << std::endl;
     inter_time = clock();
 

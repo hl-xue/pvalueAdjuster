@@ -5,7 +5,7 @@ Adjust large p-value list with [Benjamini–Hochberg procedure](https://en.wikip
 To compile, clone the repository and ```make```.
 
 ```text
-Usage:	pvalueAdjuster -out-path ADJUSTED_PVAL_PATH RAW_PVAL_PATH
+Usage: pvalueAdjuster -out-path ADJUSTED_PVAL_PATH RAW_PVAL_PATH
 ```
 
 Note:
